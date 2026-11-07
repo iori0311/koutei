@@ -5,7 +5,6 @@
 | `koutei-{{VERSION}}-mac-apple-silicon.dmg` | Mac のアプリ（M1 以降のチップ） |
 | `koutei-{{VERSION}}-mac-intel.dmg` | Mac のアプリ（Intel のチップ） |
 | `koutei-{{VERSION}}-windows-x64-setup.exe` | Windows 10・11 のアプリ（インストーラー） |
-| `koutei-{{VERSION}}-browser.zip` | ブラウザ版（HTML）と、AI エージェント用の MCP サーバー |
 | `SHA256SUMS.txt` | 各ファイルの SHA-256 |
 
 Mac のチップは、アップルメニュー →「この Mac について」の「チップ」で確かめられます。

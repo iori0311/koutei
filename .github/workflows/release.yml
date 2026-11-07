@@ -1,4 +1,4 @@
-# v から始まるタグ（例：v0.1.0）を push すると、Mac・Windows のインストーラーとブラウザ版を作り、リリースの下書きに載せる。
+# v から始まるタグ（例：v0.1.0）を push すると、Mac・Windows のインストーラーを作り、リリースの下書きに載せる。
 # 下書きを確かめて「Publish release」を押すと公開される。
 name: リリース
 
@@ -109,8 +109,8 @@ jobs:
           path: out/*
           if-no-files-found: error
 
-  web:
-    name: ブラウザ版・MCP サーバー
+  test:
+    name: テスト
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -118,23 +118,10 @@ jobs:
         with:
           node-version: 22
       - run: npm test
-      - name: まとめる
-        run: |
-          v=$(sed -n 's/^version = "\(.*\)"$/\1/p' desktop/src-tauri/Cargo.toml | head -1)
-          mkdir -p out
-          python3 -c 'import sys, zipfile
-          with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as z:
-              for f in sys.argv[2:]: z.write(f, f)' "out/koutei-$v-browser.zip" 取り付け工程表.html 取り付け工程表_サンプル.html 取り付け工程表_mcp.mjs
-          ls -la out
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: web
-          path: out/*
-          if-no-files-found: error
 
   release:
     name: リリースの下書きを作る
-    needs: [desktop, web]
+    needs: [desktop, test]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
