@@ -210,7 +210,38 @@ npm run app           # インストーラーを作る（src-tauri/target/releas
    git push origin v0.1.1
    ```
 
-3. GitHub Actions が Mac（Apple シリコン・Intel）・Windows のインストーラーを作り、[リリース](https://github.com/iori0311/koutei/releases)の下書きに載せます。中身を確かめて「Publish release」を押すと公開されます
+3. GitHub Actions が Mac（Apple シリコン・Intel）・Windows のインストーラーを作り（Mac は、下の「署名の設定」がしてあれば署名と公証まで）、[リリース](https://github.com/iori0311/koutei/releases)の下書きに載せます。中身を確かめて「Publish release」を押すと公開されます
+
+### 署名の設定（Mac）
+
+Apple の Developer ID で署名して公証すると、Mac ではじめて開くときの「このまま開く」が要らなくなります。リポジトリの secrets に次の 5 つを登録すると、リリースのワークフローが署名と公証をします（登録がなければ、今までどおり ad-hoc 署名で作ります）。
+
+| secrets | 中身 |
+| --- | --- |
+| `APPLE_CERTIFICATE` | 「Developer ID Application」の証明書（秘密鍵ごと書き出した `.p12`）を base64 にしたもの |
+| `APPLE_CERTIFICATE_PASSWORD` | `.p12` を書き出したときに付けたパスワード |
+| `APPLE_API_KEY_P8` | 公証に使う App Store Connect の API キー（`.p8` ファイルの中身） |
+| `APPLE_API_KEY` | その API キーの Key ID |
+| `APPLE_API_ISSUER` | Issuer ID |
+
+1. [Apple Developer Program](https://developer.apple.com/programs/enroll/) に登録する。証明書には登録した名前（個人で登録したなら本人の名前）が入り、署名したアプリから誰でも読めます
+2. 証明書を作る
+   - 「キーチェーンアクセス」のメニュー →「証明書アシスタント」→「認証局に証明書を要求」で、「ディスクに保存」を選んで要求ファイル（`.certSigningRequest`）を作る
+   - [Certificates](https://developer.apple.com/account/resources/certificates/list) の ＋ で「Developer ID Application」を選び、要求ファイルを上げる。できた `.cer` をダウンロードして、ダブルクリックでキーチェーンに入れる
+   - キーチェーンアクセスの「自分の証明書」で「Developer ID Application: …」を右クリック →「書き出す」で `.p12` にする（パスワードを付ける）
+3. 公証用の API キーを作る：[App Store Connect](https://appstoreconnect.apple.com/) の「ユーザとアクセス」→「統合」→「App Store Connect API」で、チームキーを ＋（アクセスは「Developer」）。`.p8` をダウンロードし（1 回しかできません）、Key ID と Issuer ID を控える
+4. secrets に登録する。値は画面に出さずに、そのまま GitHub に送ります（パスワード・Key ID・Issuer ID は、聞かれたら貼る）
+
+   ```bash
+   base64 -i 書き出した.p12 | gh secret set APPLE_CERTIFICATE --repo iori0311/koutei
+   gh secret set APPLE_CERTIFICATE_PASSWORD --repo iori0311/koutei
+   gh secret set APPLE_API_KEY_P8 --repo iori0311/koutei < AuthKey_XXXXXXXXXX.p8
+   gh secret set APPLE_API_KEY --repo iori0311/koutei
+   gh secret set APPLE_API_ISSUER --repo iori0311/koutei
+   ```
+
+   登録したら、`.p12` と `.p8` のファイルは消してかまいません（秘密鍵はキーチェーンに残ります。API キーは作り直せます）
+5. 「Actions」→「リリース」→「Run workflow」で、タグを付けずに試せます（下書きは作りません）。Mac の「確かめる」に「Developer ID で署名し、公証済み」と出れば通っています
 
 ## ライセンス
 

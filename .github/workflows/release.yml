@@ -1,5 +1,7 @@
 # v から始まるタグ（例：v0.1.0）を push すると、Mac・Windows のインストーラーを作り、リリースの下書きに載せる。
 # 下書きを確かめて「Publish release」を押すと公開される。
+# Mac は、Apple の証明書と公証用の鍵（secrets の APPLE_*。README の「署名の設定」）が登録してあれば、
+# Developer ID で署名して公証する。登録がなければ ad-hoc 署名で作る。
 name: リリース
 
 on:
@@ -34,6 +36,9 @@ jobs:
             target: x86_64-pc-windows-msvc
             asset: windows-x64-setup.exe
     runs-on: ${{ matrix.os }}
+    env:
+      # Mac で、Apple の証明書が登録してあるときだけ署名・公証する
+      MAC_SIGN: ${{ contains(matrix.target, 'apple-darwin') && secrets.APPLE_CERTIFICATE != '' }}
     defaults:
       run:
         shell: bash
@@ -71,7 +76,46 @@ jobs:
         run: node build.mjs && node desktop/scripts/check-codex.mjs
       - name: ビルド
         working-directory: desktop
-        run: npx tauri build --target ${{ matrix.target }} --ci
+        env:
+          # Apple の secrets は Mac のときだけ渡す
+          CERTIFICATE: ${{ contains(matrix.target, 'apple-darwin') && secrets.APPLE_CERTIFICATE || '' }}
+          CERTIFICATE_PASSWORD: ${{ contains(matrix.target, 'apple-darwin') && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          API_KEY: ${{ contains(matrix.target, 'apple-darwin') && secrets.APPLE_API_KEY || '' }}
+          API_ISSUER: ${{ contains(matrix.target, 'apple-darwin') && secrets.APPLE_API_ISSUER || '' }}
+          API_KEY_P8: ${{ contains(matrix.target, 'apple-darwin') && secrets.APPLE_API_KEY_P8 || '' }}
+        run: |
+          if [ "$MAC_SIGN" = true ]; then
+            for name in CERTIFICATE_PASSWORD API_KEY API_ISSUER API_KEY_P8; do
+              if [ -z "${!name}" ]; then
+                echo "::error::secrets の APPLE_$name が登録されていません"
+                exit 1
+              fi
+            done
+            printf '%s\n' "$API_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
+            # Tauri が証明書を一時のキーチェーンに入れて .app と dmg に署名し、.app を公証して staple する。
+            # 署名に使う名前は証明書から取る。ここでは Developer ID の証明書であることだけを求める
+            export APPLE_CERTIFICATE="$CERTIFICATE" APPLE_CERTIFICATE_PASSWORD="$CERTIFICATE_PASSWORD" \
+              APPLE_SIGNING_IDENTITY="Developer ID Application" \
+              APPLE_API_KEY="$API_KEY" APPLE_API_ISSUER="$API_ISSUER" APPLE_API_KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
+          fi
+          npx tauri build --target ${{ matrix.target }} --ci
+      - name: dmg を公証する（Mac・署名するとき）
+        if: env.MAC_SIGN == 'true'
+        env:
+          API_KEY: ${{ secrets.APPLE_API_KEY }}
+          API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          dmg=$(ls desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg)
+          auth=(--key "$RUNNER_TEMP/AuthKey.p8" --key-id "$API_KEY" --issuer "$API_ISSUER")
+          xcrun notarytool submit "$dmg" "${auth[@]}" --wait --timeout 1h --output-format json > "$RUNNER_TEMP/notary.json" || true
+          cat "$RUNNER_TEMP/notary.json"
+          status=$(node -p 'require(process.argv[1]).status' "$RUNNER_TEMP/notary.json" 2>/dev/null || echo 不明)
+          if [ "$status" != Accepted ]; then
+            xcrun notarytool log "$(node -p 'require(process.argv[1]).id' "$RUNNER_TEMP/notary.json")" "${auth[@]}" || true
+            echo "::error::dmg の公証が通りませんでした（$status）"
+            exit 1
+          fi
+          xcrun stapler staple "$dmg"
       - name: できたものを集める
         run: |
           mkdir -p out
@@ -82,13 +126,28 @@ jobs:
           esac
           cp "$src" "out/koutei-$VERSION-${{ matrix.asset }}"
           ls -la out
-      - name: 確かめる（Mac：署名と、同梱の Codex が OpenAI の署名のままか）
+      - name: 確かめる（Mac：署名・公証と、同梱の Codex が OpenAI の署名のままか）
         if: runner.os == 'macOS'
         run: |
           app=$(ls -d desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app)
+          dmg=$(ls out/*.dmg)
           codesign --verify --deep --strict "$app"
           codesign -dv "$app/Contents/Resources/codex" 2>&1 | grep "TeamIdentifier=2DC432GLL2"
           test -f "$app/Contents/Resources/licenses/codex-LICENSE.txt"
+          if [ "$MAC_SIGN" != true ]; then
+            echo "::warning::Mac は Apple の証明書なし（ad-hoc 署名）で作りました"
+            exit 0
+          fi
+          # must <出力に含むはずの文字> <コマンド…>。署名者の名前は、失敗したときだけログに出す
+          must() { out=$("${@:2}" 2>&1) && grep -q "$1" <<< "$out" || { echo "$out"; exit 1; }; }
+          must "" codesign --verify --strict "$dmg"
+          must "^Authority=Developer ID Application:" codesign -dvv "$app"
+          must "^Authority=Developer ID Application:" codesign -dvv "$dmg"
+          must "" xcrun stapler validate "$app"
+          must "" xcrun stapler validate "$dmg"
+          must "source=Notarized Developer ID" spctl --assess --type execute -vv "$app"
+          must "source=Notarized Developer ID" spctl --assess --type open --context context:primary-signature -vv "$dmg"
+          echo "Mac：Developer ID で署名し、公証済み"
       - name: 確かめる（Windows：インストールして起動する）
         if: runner.os == 'Windows'
         shell: pwsh
@@ -135,7 +194,16 @@ jobs:
       - name: 下書きを作る
         env:
           GH_TOKEN: ${{ github.token }}
+          # 証明書が登録してあれば、Mac の 2 つは署名・公証まで確かめてある（通らなければここまで来ない）
+          MAC_SIGNED: ${{ secrets.APPLE_CERTIFICATE != '' }}
         run: |
           (cd out && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
-          sed "s/{{VERSION}}/${GITHUB_REF_NAME#v}/g" .github/release-notes.md > "$RUNNER_TEMP/notes.md"
+          # 説明の「はじめて開くとき」の Mac は、署名したかどうかで片方だけ残す
+          if [ "$MAC_SIGNED" = true ]; then keep=mac-signed drop=mac-unsigned; else keep=mac-unsigned drop=mac-signed; fi
+          sed "s/{{VERSION}}/${GITHUB_REF_NAME#v}/g" .github/release-notes.md | awk -v keep="$keep" -v drop="$drop" '
+            $0 == "<!-- " drop " -->" { skip = 1; next }
+            $0 == "<!-- /" drop " -->" { skip = 0; next }
+            $0 == "<!-- " keep " -->" || $0 == "<!-- /" keep " -->" { next }
+            !skip' > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
           gh release create "$GITHUB_REF_NAME" out/* --draft --verify-tag --title "取り付け工程表 $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
