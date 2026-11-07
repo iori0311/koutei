@@ -1,0 +1,268 @@
+{
+ "app": "koutei-gantt",
+ "v": 1,
+ "categories": [
+  {
+   "id": "c-koji",
+   "name": "工事日決定",
+   "color": "FF0000"
+  },
+  {
+   "id": "c-sash",
+   "name": "サッシ搬入",
+   "color": "FFFF00"
+  },
+  {
+   "id": "c-door",
+   "name": "玄関ドア搬入",
+   "color": "00B050"
+  },
+  {
+   "id": "c-kensa",
+   "name": "検査・引渡し・社内検査",
+   "color": "7030A0"
+  },
+  {
+   "id": "c-hoshu",
+   "name": "補修工事",
+   "color": "92D050"
+  },
+  {
+   "id": "c-jishu",
+   "name": "自主検査",
+   "color": "FFC000"
+  },
+  {
+   "id": "c-saibo",
+   "name": "災防協",
+   "color": "002060"
+  },
+  {
+   "id": "c-tenaoshi",
+   "name": "手直し",
+   "color": "C00000"
+  },
+  {
+   "id": "c-ouen",
+   "name": "応援",
+   "color": "00B0F0"
+  },
+  {
+   "id": "c-memo",
+   "name": "色なし",
+   "color": "C9CED6",
+   "memo": true
+  }
+ ],
+ "properties": [
+  {
+   "id": "pmw5z9w3t0001hzc",
+   "name": "（仮称）住之江区北加賀屋新築工事",
+   "contractor": "サンプル建設\nサンプル工業",
+   "order": 1
+  },
+  {
+   "id": "pmw5z9w3u000jqhl",
+   "name": "（仮称）西成区南津守新築工事",
+   "contractor": "サンプル建設\n見本工業",
+   "order": 2
+  }
+ ],
+ "events": [
+  {
+   "label": "サッシ図面承認",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-memo",
+   "start": "2026-10-09",
+   "end": "2026-10-09",
+   "id": "emw5z9w3u0002zfm"
+  },
+  {
+   "label": "災害防止協議会 13:30",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-saibo",
+   "start": "2026-10-16",
+   "end": "2026-10-16",
+   "pinned": true,
+   "id": "emw5z9w3u0003alq"
+  },
+  {
+   "label": "2〜6階サッシ搬入 8:30",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-sash",
+   "start": "2026-10-20",
+   "end": "2026-10-20",
+   "id": "emw5z9w3u0004582"
+  },
+  {
+   "label": "2階サッシ取付",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-koji",
+   "start": "2026-10-22",
+   "end": "2026-10-22",
+   "id": "emw5z9w3u0005ojj"
+  },
+  {
+   "label": "3階サッシ取付",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-koji",
+   "start": "2026-10-24",
+   "end": "2026-10-24",
+   "id": "emw5z9w3u0006lho"
+  },
+  {
+   "label": "4階サッシ取付",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-koji",
+   "start": "2026-10-26",
+   "end": "2026-10-26",
+   "id": "emw5z9w3u0007vip"
+  },
+  {
+   "label": "5階サッシ取付",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-koji",
+   "start": "2026-10-28",
+   "end": "2026-10-28",
+   "id": "emw5z9w3u000834z"
+  },
+  {
+   "label": "6階サッシ取付",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-koji",
+   "start": "2026-10-30",
+   "end": "2026-10-30",
+   "id": "emw5z9w3u0009nvy"
+  },
+  {
+   "label": "玄関扉搬入（2〜6階）",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-door",
+   "start": "2026-11-02",
+   "end": "2026-11-02",
+   "id": "emw5z9w3u000aact"
+  },
+  {
+   "label": "玄関扉吊込み",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-koji",
+   "start": "2026-11-04",
+   "end": "2026-11-06",
+   "id": "emw5z9w3u000b0va"
+  },
+  {
+   "label": "PS扉吊込み",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-memo",
+   "start": "2026-11-06",
+   "end": "2026-11-06",
+   "id": "emw5z9w3u000c6gd"
+  },
+  {
+   "label": "PS扉・SD扉吊込み",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-koji",
+   "start": "2026-11-09",
+   "end": "2026-11-10",
+   "id": "emw5z9w3u000d258"
+  },
+  {
+   "label": "網戸取付",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-koji",
+   "start": "2026-11-12",
+   "end": "2026-11-12",
+   "id": "emw5z9w3u000e86g"
+  },
+  {
+   "label": "自主検査",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-jishu",
+   "start": "2026-11-16",
+   "end": "2026-11-16",
+   "id": "emw5z9w3u000fl35"
+  },
+  {
+   "label": "社内検査",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-kensa",
+   "start": "2026-11-18",
+   "end": "2026-11-18",
+   "id": "emw5z9w3u000ghgk"
+  },
+  {
+   "label": "手直し期間",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-tenaoshi",
+   "start": "2026-11-19",
+   "end": "2026-11-21",
+   "id": "emw5z9w3u000hijj"
+  },
+  {
+   "label": "施主検査・引渡し",
+   "pid": "pmw5z9w3t0001hzc",
+   "cat": "c-kensa",
+   "start": "2026-11-25",
+   "end": "2026-11-25",
+   "id": "emw5z9w3u000i680"
+  },
+  {
+   "label": "実測",
+   "pid": "pmw5z9w3u000jqhl",
+   "cat": "c-memo",
+   "start": "2026-10-19",
+   "end": "2026-10-19",
+   "id": "emw5z9w3u000k65f"
+  },
+  {
+   "label": "サッシ搬入",
+   "pid": "pmw5z9w3u000jqhl",
+   "cat": "c-sash",
+   "start": "2026-11-09",
+   "end": "2026-11-09",
+   "id": "emw5z9w3u000l82t"
+  },
+  {
+   "label": "2・3階サッシ取付",
+   "pid": "pmw5z9w3u000jqhl",
+   "cat": "c-koji",
+   "start": "2026-11-10",
+   "end": "2026-11-11",
+   "id": "emw5z9w3u000m8v2"
+  },
+  {
+   "label": "4・5階サッシ取付",
+   "pid": "pmw5z9w3u000jqhl",
+   "cat": "c-koji",
+   "start": "2026-11-12",
+   "end": "2026-11-13",
+   "id": "emw5z9w3u000ns7i"
+  },
+  {
+   "label": "6・7階サッシ取付",
+   "pid": "pmw5z9w3u000jqhl",
+   "cat": "c-koji",
+   "start": "2026-11-16",
+   "end": "2026-11-17",
+   "id": "emw5z9w3u000ohov"
+  }
+ ],
+ "contractors": [
+  "サンプル建設\n見本工業",
+  "サンプル建設\nサンプル工業"
+ ],
+ "prefs": {
+  "view": null,
+  "periods": {
+   "all": {
+    "from": 20727,
+    "months": 2
+   }
+  },
+  "print": {
+   "paper": "A3",
+   "orient": "landscape"
+  }
+ },
+ "views": []
+}

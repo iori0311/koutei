@@ -1,0 +1,10 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": ["nsis"],
+    "resources": { "binaries/codex.exe": "codex.exe" },
+    "windows": {
+      "nsis": { "installMode": "currentUser", "languages": ["Japanese"], "displayLanguageSelector": false }
+    }
+  }
+}

@@ -1,0 +1,154 @@
+# v から始まるタグ（例：v0.1.0）を push すると、Mac・Windows のインストーラーとブラウザ版を作り、リリースの下書きに載せる。
+# 下書きを確かめて「Publish release」を押すと公開される。
+name: リリース
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  desktop:
+    name: アプリ（${{ matrix.label }}）
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Mac・Apple シリコン
+            os: macos-latest
+            target: aarch64-apple-darwin
+            asset: mac-apple-silicon.dmg
+          - label: Mac・Intel
+            os: macos-latest
+            target: x86_64-apple-darwin
+            asset: mac-intel.dmg
+          - label: Windows
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            asset: windows-x64-setup.exe
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: 版を確かめる
+        run: |
+          v=$(sed -n 's/^version = "\(.*\)"$/\1/p' desktop/src-tauri/Cargo.toml | head -1)
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "v$v" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::タグ $GITHUB_REF_NAME と Cargo.toml の版 $v が合っていません"
+            exit 1
+          fi
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+      - name: Rust
+        run: |
+          rustup update stable --no-self-update
+          rustup default stable
+          rustup target add ${{ matrix.target }}
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            desktop/src-tauri/target
+          key: release-${{ matrix.target }}-${{ hashFiles('desktop/src-tauri/Cargo.lock') }}
+      - run: npm ci
+        working-directory: desktop
+      - name: 同梱する Codex を取ってくる
+        run: node desktop/scripts/fetch-codex.mjs --target ${{ matrix.target }}
+      - name: 同梱する Codex を、アプリと同じ設定で確かめる
+        if: matrix.target != 'x86_64-apple-darwin'
+        run: node build.mjs && node desktop/scripts/check-codex.mjs
+      - name: ビルド
+        working-directory: desktop
+        run: npx tauri build --target ${{ matrix.target }} --ci
+      - name: できたものを集める
+        run: |
+          mkdir -p out
+          bundle=desktop/src-tauri/target/${{ matrix.target }}/release/bundle
+          case "${{ matrix.target }}" in
+            *windows*) src=$(ls "$bundle"/nsis/*-setup.exe) ;;
+            *) src=$(ls "$bundle"/dmg/*.dmg) ;;
+          esac
+          cp "$src" "out/koutei-$VERSION-${{ matrix.asset }}"
+          ls -la out
+      - name: 確かめる（Mac：署名と、同梱の Codex が OpenAI の署名のままか）
+        if: runner.os == 'macOS'
+        run: |
+          app=$(ls -d desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app)
+          codesign --verify --deep --strict "$app"
+          codesign -dv "$app/Contents/Resources/codex" 2>&1 | grep "TeamIdentifier=2DC432GLL2"
+          test -f "$app/Contents/Resources/licenses/codex-LICENSE.txt"
+      - name: 確かめる（Windows：インストールして起動する）
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem out\*.exe | Select-Object -First 1
+          Start-Process -FilePath $setup.FullName -ArgumentList '/S', '/D=C:\koutei-test' -Wait
+          Get-ChildItem -Recurse C:\koutei-test | Select-Object FullName, Length
+          if (-not (Test-Path C:\koutei-test\codex.exe)) { throw 'codex.exe が入っていません' }
+          if (-not (Test-Path C:\koutei-test\licenses\codex-LICENSE.txt)) { throw 'Codex のライセンスが入っていません' }
+          $exe = Get-ChildItem C:\koutei-test\*.exe | Where-Object { $_.Name -notin @('codex.exe', 'uninstall.exe') } | Select-Object -First 1
+          $p = Start-Process -FilePath $exe.FullName -PassThru
+          Start-Sleep -Seconds 15
+          if ($p.HasExited) { throw "アプリがすぐに終わりました（$($p.ExitCode)）" }
+          Stop-Process -Id $p.Id -Force
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.target }}
+          path: out/*
+          if-no-files-found: error
+
+  web:
+    name: ブラウザ版・MCP サーバー
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: npm test
+      - name: まとめる
+        run: |
+          v=$(sed -n 's/^version = "\(.*\)"$/\1/p' desktop/src-tauri/Cargo.toml | head -1)
+          mkdir -p out
+          python3 -c 'import sys, zipfile
+          with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as z:
+              for f in sys.argv[2:]: z.write(f, f)' "out/koutei-$v-browser.zip" 取り付け工程表.html 取り付け工程表_サンプル.html 取り付け工程表_mcp.mjs
+          ls -la out
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web
+          path: out/*
+          if-no-files-found: error
+
+  release:
+    name: リリースの下書きを作る
+    needs: [desktop, web]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: out
+          merge-multiple: true
+      - name: 下書きを作る
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          (cd out && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          sed "s/{{VERSION}}/${GITHUB_REF_NAME#v}/g" .github/release-notes.md > "$RUNNER_TEMP/notes.md"
+          gh release create "$GITHUB_REF_NAME" out/* --draft --verify-tag --title "取り付け工程表 $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"

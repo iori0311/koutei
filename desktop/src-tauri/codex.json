@@ -1,0 +1,25 @@
+{
+  "comment": "同梱する Codex（https://github.com/openai/codex の GitHub Releases）。版を上げるときは、scripts/check-codex.mjs と cargo test で確かめてから、ここのハッシュを書き換える",
+  "version": "0.153.4",
+  "tag": "rust-v0.153.4",
+  "targets": {
+    "aarch64-apple-darwin": {
+      "asset": "codex-aarch64-apple-darwin.tar.gz",
+      "assetSha256": "8cf911ea676523bfb2121ec561848d2aba564890ad536db4d8a3353f2b9850b1",
+      "file": "codex-aarch64-apple-darwin",
+      "sha256": "b973d440acac501fd2594a43e7ca9ce41e0a65b9dfb28d0d7a7837c99e1261e3"
+    },
+    "x86_64-apple-darwin": {
+      "asset": "codex-x86_64-apple-darwin.tar.gz",
+      "assetSha256": "d69200f0bf841b1d1a07f80b80cf742a2e4fc2bab91ae8a44b1042f8e8ca9fa4",
+      "file": "codex-x86_64-apple-darwin",
+      "sha256": "88ecd2cbf8044832a49e7710394d9d328f7205fa5e8c8ebbdd015e002b4f6e21"
+    },
+    "x86_64-pc-windows-msvc": {
+      "asset": "codex-x86_64-pc-windows-msvc.exe.tar.gz",
+      "assetSha256": "e5434e7df009c65c610b03088b34a9f9df338d7e6b83f6dc07520da00542e44b",
+      "file": "codex-x86_64-pc-windows-msvc.exe",
+      "sha256": "444a3f0008050605cae73cd9b7a2dcac61294062dfaab56dd20430fd6498518b"
+    }
+  }
+}

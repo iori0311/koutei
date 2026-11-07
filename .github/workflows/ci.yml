@@ -1,0 +1,68 @@
+# main への push と pull request で、テストと、Mac・Windows での同梱の Codex・cargo test を確かめる
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: ブラウザ版・MCP サーバーのテスト
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: npm test
+
+  desktop:
+    name: デスクトップ版（${{ matrix.label }}）
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Mac
+            os: macos-latest
+          - label: Windows
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Rust
+        run: |
+          rustup update stable --no-self-update
+          rustup default stable
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            desktop/src-tauri/target
+          key: ci-${{ runner.os }}-${{ hashFiles('desktop/src-tauri/Cargo.lock') }}
+      - run: node build.mjs
+      - name: 同梱する Codex を取ってくる
+        run: node desktop/scripts/fetch-codex.mjs
+      - name: 同梱する Codex を、アプリと同じ設定で確かめる
+        run: node desktop/scripts/check-codex.mjs
+      - name: cargo test（偽のモデルを相手に、同梱の Codex との往復まで）
+        env:
+          KOUTEI_CODEX_PROBE: http://127.0.0.1:8799/v1
+        run: |
+          node desktop/scripts/fake-model.mjs 8799 &
+          sleep 2
+          cargo test --manifest-path desktop/src-tauri/Cargo.toml

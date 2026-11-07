@@ -1,0 +1,6 @@
+{
+  "identifier": "main",
+  "description": "取り付け工程表のウィンドウ。アプリが用意したコマンドだけを呼べる（ファイルとブラウザはアプリ側で開く）",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

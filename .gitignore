@@ -1,0 +1,12 @@
+# 作ったもの（node build.mjs・npx tauri build で作り直せる）
+/取り付け工程表.html
+/取り付け工程表_サンプル.html
+/取り付け工程表_mcp.mjs
+/desktop/dist/
+/desktop/src-tauri/koutei-tools.json
+/desktop/src-tauri/target/
+/desktop/src-tauri/gen/
+# 同梱する Codex（node desktop/scripts/fetch-codex.mjs で取ってくる）
+/desktop/src-tauri/binaries/
+node_modules/
+.DS_Store

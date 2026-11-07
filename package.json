@@ -1,0 +1,11 @@
+{
+  "name": "koutei",
+  "private": true,
+  "type": "module",
+  "description": "取り付け工程表（ブラウザ版・MCP サーバー・デスクトップ版の画面を src/ から作る）",
+  "license": "MIT",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node build.mjs && node tests/modules.mjs && node tests/agent.mjs && node tests/views.mjs && node tests/mcp.mjs"
+  }
+}

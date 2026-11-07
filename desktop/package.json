@@ -1,0 +1,16 @@
+{
+  "name": "torituke-koutei-desktop",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "web": "node ../build.mjs",
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "app": "tauri build",
+    "fetch:codex": "node scripts/fetch-codex.mjs",
+    "check:codex": "node scripts/check-codex.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4"
+  }
+}
