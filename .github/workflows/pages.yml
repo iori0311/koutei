@@ -1,0 +1,55 @@
+# main に push すると、ブラウザ版を Web 版として GitHub Pages（https://iori0311.github.io/koutei/）に出す。
+# 出すのは HTML 1 つだけ。データは使う人のブラウザの中と、その人が保存した JSON にあり、サーバーには送らない。
+name: Web 版
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'build.mjs'
+      - 'package.json'
+      - 'tests/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 作る
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      # テストが通ったときだけ出す（npm test の中で HTML も作り直す）
+      - run: npm test
+      - name: 出すものを集める
+        run: |
+          mkdir -p site
+          cp 取り付け工程表.html site/index.html
+          ls -la site
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+  deploy:
+    name: 出す
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
