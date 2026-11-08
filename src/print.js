@@ -165,7 +165,7 @@ function printScale(from, to, dayW, info) {
     const inf = info(d);
     const x = (d - from) * dayW;
     const { d: dd } = ymd(d);
-    const cls = (inf.kind ? ' ' + inf.kind : '') + (inf.w === 0 || inf.kind === 'sun' ? ' red' : inf.w === 6 ? ' blue' : '');
+    const cls = inf.kind === 'off' ? ' off red' : '';
     if (mode === 'week') {
       if (inf.w === 1) drow.append(h('div', { class: 'p-wk', style: 'left:' + mm(x) }, dd));
       continue;
@@ -250,7 +250,7 @@ function overviewPages(cfg, pw, ph) {
   const [from, to] = overviewRange();
   const props = store.viewProperties();
   const view = store.activeView();
-  const info = makeDayInfo();
+  const info = makeDayInfo(store.state);   // 土日・祝日・社内休暇（出社日は除く）
   const padX = 8, padY = 7;
   const innerW = pw - padX * 2;
   const nameW = Math.min(52, Math.max(34, innerW * 0.12));

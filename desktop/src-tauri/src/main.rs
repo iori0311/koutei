@@ -12,6 +12,7 @@ use std::{
 };
 use tauri::{ipc::Channel, Manager, State};
 use tauri_plugin_opener::OpenerExt;
+use tauri_plugin_updater::{Update, UpdaterExt};
 use tokio::sync::Mutex;
 
 #[derive(Default)]
@@ -204,6 +205,73 @@ async fn ai_send(app: tauri::AppHandle, window: tauri::WebviewWindow, state: Sta
     result
 }
 
+// ---- アプリの更新 ----
+// GitHub のリリース（公開したもの）の latest.json を見て、新しい版があれば落として入れ、開き直す。
+// 落とした中身は、リリースのときに付けた署名で確かめる（公開鍵は tauri.conf.json の plugins.updater）
+#[derive(Default)]
+struct Updates {
+    update: Mutex<Option<Update>>,
+    bytes: Mutex<Option<Vec<u8>>>,
+}
+#[derive(Serialize)]
+struct UpdateInfo { version: String, current: String }
+
+fn update_error(what: &str, e: impl std::fmt::Display) -> String { format!("{what}（{e}）") }
+
+#[tauri::command]
+async fn update_check(app: tauri::AppHandle, window: tauri::WebviewWindow, state: State<'_, Updates>) -> Result<Option<UpdateInfo>, String> {
+    main_window(&window)?;
+    let found = app.updater().map_err(|e| update_error("アップデートを確かめられませんでした", e))?
+        .check().await.map_err(|e| update_error("アップデートを確かめられませんでした", e))?;
+    let info = found.as_ref().map(|u| UpdateInfo { version: u.version.clone(), current: u.current_version.clone() });
+    *state.update.lock().await = found;
+    *state.bytes.lock().await = None;
+    Ok(info)
+}
+
+// 新しい版を落とす。進み具合は on_progress に（受け取った量, 全体の量）で知らせる
+#[tauri::command]
+async fn update_download(window: tauri::WebviewWindow, state: State<'_, Updates>, on_progress: Channel<(u64, Option<u64>)>) -> Result<(), String> {
+    main_window(&window)?;
+    let update = state.update.lock().await.clone().ok_or("アップデートが見つかっていません。")?;
+    let mut got = 0u64;
+    let bytes = update.download(|n, total| { got += n as u64; let _ = on_progress.send((got, total)); }, || {})
+        .await.map_err(|e| update_error("アップデートをダウンロードできませんでした", e))?;
+    *state.bytes.lock().await = Some(bytes);
+    Ok(())
+}
+
+// 落とした版を入れて、アプリを開き直す（画面は保存を済ませてから呼ぶ）。Windows では入れる途中でアプリが閉じ、入れ終わると開く
+#[tauri::command]
+async fn update_apply(app: tauri::AppHandle, window: tauri::WebviewWindow, ai: State<'_, Ai>, state: State<'_, Updates>) -> Result<(), String> {
+    main_window(&window)?;
+    let update = state.update.lock().await.clone().ok_or("アップデートが見つかっていません。")?;
+    let bytes = state.bytes.lock().await.take().ok_or("アップデートをまだダウンロードしていません。")?;
+    if let Some(c) = ai.client.lock().await.take() { c.kill(); }
+    update.install(&bytes).map_err(|e| update_error("アップデートをインストールできませんでした", e))?;
+    app.restart();
+}
+
+// 確かめ用（開発用のビルドだけ）：KOUTEI_UPDATE_SELFTEST があれば、起動してすぐ更新を確かめて入れ、開き直す
+#[cfg(debug_assertions)]
+fn update_selftest(app: &tauri::AppHandle) {
+    if std::env::var_os("KOUTEI_UPDATE_SELFTEST").is_none() { return; }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let result = async {
+            let update = app.updater().map_err(|e| e.to_string())?.check().await.map_err(|e| e.to_string())?.ok_or("新しい版がない")?;
+            eprintln!("selftest: {} -> {}", update.current_version, update.version);
+            let bytes = update.download(|_, _| {}, || {}).await.map_err(|e| e.to_string())?;
+            update.install(&bytes).map_err(|e| e.to_string())?;
+            Ok::<(), String>(())
+        }.await;
+        match result {
+            Ok(()) => { eprintln!("selftest: installed, restarting"); app.restart(); }
+            Err(e) => { eprintln!("selftest: {e}"); std::process::exit(3); }
+        }
+    });
+}
+
 // 印刷（アプリの画面では window.print() の代わりに、ここから印刷の画面を出す）
 #[tauri::command]
 fn print_page(window: tauri::WebviewWindow) -> Result<(), String> {
@@ -215,10 +283,18 @@ fn main() {
     tauri::Builder::default()
         .manage(Ai::default())
         .manage(files::Files::default())
+        .manage(Updates::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .setup(|_app| {
+            #[cfg(debug_assertions)]
+            update_selftest(_app.handle());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             ai_connect, ai_login, ai_logout, ai_reset, ai_stop, ai_resolve_tool, ai_send, print_page,
+            update_check, update_download, update_apply,
             files::file_pick_save, files::file_pick_open, files::file_stat, files::file_read, files::file_write
         ])
         .run(tauri::generate_context!())

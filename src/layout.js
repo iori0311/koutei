@@ -19,15 +19,26 @@ export function textW(text, px, weight = 400) {
   return w;
 }
 
-// 網掛けする日: 'sun'（日曜・祝日。うすいオレンジ）/ 'sat'（土曜）/ ''。今までの取付工程表と同じく土曜も網掛けする
-export function makeDayInfo() {
+// 網掛けする日: 'off'（休み。土日・祝日・社内休暇。どれもうすいオレンジ）/ ''（出社する日）
+// days: { offDays: 社内休暇 [{ name, start, end }]、workDays: 出社日 [日付] }（ストアの state をそのまま渡せる）。
+// 出社日は、土日・祝日・社内休暇でも休みにしない。name はカーソルを乗せたときに出す説明
+export function makeDayInfo(days = {}) {
+  const off = new Map();
+  for (const o of days.offDays || []) {
+    for (let d = o.start; d <= Math.min(o.end, o.start + 400); d++) if (!off.has(d)) off.set(d, o.name || '');
+  }
+  const work = new Set(days.workDays || []);
   const cache = new Map();
   return (d) => {
     let v = cache.get(d);
     if (!v) {
       const w = dow(d);
       const jp = jpHoliday(d);
-      v = { w, kind: w === 0 || jp ? 'sun' : w === 6 ? 'sat' : '', name: jp };
+      const co = off.get(d);
+      const isWork = work.has(d);
+      const rest = !isWork && (w === 0 || w === 6 || !!jp || co !== undefined);
+      const name = [jp, co === undefined ? '' : '社内休暇' + (co ? '（' + co + '）' : ''), isWork ? '出社日' : ''].filter(Boolean).join('・');
+      v = { w, kind: rest ? 'off' : '', name };
       cache.set(d, v);
     }
     return v;

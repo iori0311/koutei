@@ -98,6 +98,10 @@ impl Drop for Client {
 }
 
 impl Client {
+    // アプリを更新する前に Codex を止める（Windows では動いている codex.exe は上書きできない）
+    pub fn kill(&self) {
+        if let Ok(mut child) = self.child.lock() { let _ = child.start_kill(); }
+    }
     // binary：同梱の codex、home：ログイン情報を置く場所（アプリ専用。いつもの ~/.codex とは分ける）
     pub async fn start(binary: &Path, home: &Path) -> Result<Arc<Self>, String> {
         let bytes = std::fs::read(binary).map_err(|_| "同梱の Codex が見つかりません。")?;

@@ -23,6 +23,9 @@ export function todayDn() { const t = new Date(); return fromYMD(t.getFullYear()
 export function monthStart(n) { const { y, m } = ymd(n); return fromYMD(y, m, 1); }
 export function addMonths(n, k) { const { y, m } = ymd(n); const t = (y * 12 + m - 1) + k; return fromYMD(Math.floor(t / 12), (t % 12) + 1, 1); }
 export function monthEnd(n) { return addMonths(n, 1) - 1; }
+// 年度（4 月始まり）。2026 年 4 月〜2027 年 3 月が 2026 年度
+export function fiscalYear(n) { const { y, m } = ymd(n); return m >= 4 ? y : y - 1; }
+export function fiscalRange(fy) { return [fromYMD(fy, 4, 1), fromYMD(fy + 1, 3, 31)]; }
 
 export function fmtMD(n) { const { m, d } = ymd(n); return m + '/' + d; }
 export function fmtMDW(n) { return fmtMD(n) + '(' + WD_JA[dow(n)] + ')'; }

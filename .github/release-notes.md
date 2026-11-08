@@ -5,6 +5,7 @@
 | `koutei-{{VERSION}}-mac-apple-silicon.dmg` | Mac のアプリ（M1 以降のチップ） |
 | `koutei-{{VERSION}}-mac-intel.dmg` | Mac のアプリ（Intel のチップ） |
 | `koutei-{{VERSION}}-windows-x64-setup.exe` | Windows 10・11 のアプリ（インストーラー） |
+| `*.app.tar.gz`・`latest.json` | アプリの中の更新で使うファイル（ダウンロードは要りません） |
 | `SHA256SUMS.txt` | 各ファイルの SHA-256 |
 
 Mac のチップは、アップルメニュー →「この Mac について」の「チップ」で確かめられます。

@@ -48,6 +48,8 @@ export function svgIcon(name, size = 16) {
     stop: 'M7 7h10v10H7z',
     clip: 'M16.5 6.5l-7.8 7.8a2 2 0 0 0 2.8 2.8l8-8a4 4 0 0 0-5.7-5.7l-8 8a6 6 0 0 0 8.5 8.5l6.2-6.2',
     file: 'M6 3h8l4 4v14H6zM14 3v4h4',
+    download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
+    grip: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01',
   };
   const ns = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(ns, 'svg');

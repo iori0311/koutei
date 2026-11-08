@@ -12,8 +12,7 @@
   --accent-2: #174c86;
   --accent-weak: #e8f0fa;
   --danger: #c0392b;
-  --sat: #f0f3f8;
-  --sun: #fbe8de;
+  --off: #fbe8de;   /* 休み（土日・祝日・社内休暇）の網掛け */
   --today: #e5484d;
   --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
   color-scheme: light; }
@@ -111,6 +110,11 @@ textarea { resize: vertical; line-height: 1.45; }
 .lg-del:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
 .lg-add { width: 24px; height: 24px; padding: 0; border-radius: 50%; border: 1px dashed var(--line-2); background: transparent; color: var(--accent); display: grid; place-items: center; cursor: pointer; margin-left: 2px; }
 .lg-add:hover { border-style: solid; border-color: var(--accent); background: var(--accent-weak); }
+/* 凡例の右：休日（土日・祝日・社内休暇の網掛け）の説明と、社内休暇・出社日の設定 */
+.lg-off { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px 0 8px; border: 1px solid var(--line-2); border-radius: 999px; background: #fff; font: inherit; font-size: 12px; color: var(--text); cursor: pointer; white-space: nowrap; }
+.lg-off:hover { border-color: var(--accent); background: var(--accent-weak); }
+.lg-off-chip { width: 14px; height: 12px; border-radius: 3px; background: var(--off); box-shadow: inset 0 0 0 1px #e8c3ae; }
+.lg-off small { color: var(--muted); font-size: 11px; }
 .chip { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1px solid; flex: none; }
 .chip.big { width: 16px; height: 16px; border-radius: 4px; }
 .chip.memo { background: repeating-linear-gradient(45deg, #dfe3e8 0 3px, #f6f7f9 3px 6px); border-color: #aab2bb; }
@@ -131,16 +135,13 @@ textarea { resize: vertical; line-height: 1.45; }
 .sc-day.m1 { border-left-color: var(--line-2); }
 .sc-day b { font-weight: 600; }
 .sc-day i { font-style: normal; font-size: 10px; color: var(--muted); }
-.sc-day.sun { background: var(--sun); }
-.sc-day.sat { background: var(--sat); }
-.sc-day.sun b, .sc-day.sun i, .sc-day.is-sun b, .sc-day.is-sun i { color: #c0392b; }
-.sc-day.is-sat b, .sc-day.is-sat i { color: #1d5fa6; }
+.sc-day.off { background: var(--off); }
+.sc-day.off b, .sc-day.off i { color: #c0392b; }
 .g-body { position: relative; }
 .g-bg { position: absolute; top: 0; bottom: 0; left: var(--leftw); pointer-events: none; }
 .bg-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--grid); }
 .bg-day { position: absolute; top: 0; bottom: 0; }
-.bg-day.sun { background: var(--sun); opacity: .7; }
-.bg-day.sat { background: var(--sat); }
+.bg-day.off { background: var(--off); opacity: .7; }
 .bg-month { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid var(--line-2); }
 .g-row { position: relative; display: flex; min-height: 34px; border-bottom: 1px solid var(--line); }
 .g-cells { position: sticky; left: 0; z-index: 4; width: var(--leftw); flex: none; display: flex; align-items: center; background: #fff; border-right: 1px solid var(--line-2); cursor: pointer; }
@@ -206,6 +207,13 @@ body.drag-resize, body.drag-resize * { cursor: ew-resize !important; }
 .o-site:hover, .o-site:focus-visible { background: #fff; box-shadow: inset 0 0 0 1.5px var(--accent); outline: none; }
 .o-pen { position: absolute; top: 4px; right: 5px; color: var(--accent); opacity: 0; transition: opacity .12s; display: grid; }
 .o-site:hover .o-pen, .o-site:focus-visible .o-pen { opacity: .85; }
+/* 現場の行のドラッグ（並び替え）：つかめることを示す点々・動かしている行・入る場所の線 */
+.o-grip { position: absolute; top: 50%; left: 0; width: 12px; transform: translateY(-50%); display: grid; place-items: center; color: var(--faint); opacity: 0; transition: opacity .12s; pointer-events: none; }
+.o-site:hover .o-grip { opacity: .9; }
+.o-row.row-dragging .g-cells, .o-row.row-dragging .o-track { opacity: .4; }
+.row-drop { position: absolute; left: 0; right: 0; height: 4px; background: var(--accent); border-radius: 2px; z-index: 8; pointer-events: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .9); }
+.row-drop.same { opacity: .3; }
+body.drag-row, body.drag-row * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
 .g-corner .o-name, .g-corner .o-who { justify-content: flex-end; border-left: 0; font-size: 11.5px; }
 .o-track { position: relative; flex: none; }
 .o-label { position: absolute; font-size: 12px; white-space: nowrap; cursor: pointer; padding: 0 1px; z-index: 1; }
@@ -358,8 +366,7 @@ body.pp-open { overflow: hidden; }
 .p-tbody { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 .p-bg { position: absolute; top: 0; bottom: 0; }
 .p-shade { position: absolute; top: 0; bottom: 0; }
-.p-shade.sun, .p-day.sun { background: #fbe3d6; }
-.p-shade.sat, .p-day.sat { background: #edf1f6; }
+.p-shade.off, .p-day.off { background: #fbe3d6; }
 .p-vl { position: absolute; top: 0; bottom: 0; width: 0; border-left: .12mm solid #d6dade; }
 .p-vl.m { border-left: .3mm solid #7d8792; }
 .p-bar { position: absolute; border: .25mm solid; border-radius: .7mm; overflow: hidden; white-space: nowrap; }
@@ -384,7 +391,6 @@ body.pp-open { overflow: hidden; }
 .p-day { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; font-size: .82em; border-left: .12mm solid #cdd2d8; font-variant-numeric: tabular-nums; }
 .p-scale.num .p-day { font-size: .68em; letter-spacing: -.03em; }
 .p-day.red { color: #c62828; }
-.p-day.blue { color: #1d5fa6; }
 .p-wk { position: absolute; top: 0; bottom: 0; padding-left: .5mm; font-size: .78em; border-left: .15mm solid #9aa3ad; display: flex; align-items: center; }
 .p-orow { position: relative; display: flex; border-bottom: .2mm solid #aab2bb; }
 .p-orow .p-l { display: flex; flex: none; background: #fff; }
@@ -461,6 +467,53 @@ body.pp-open { overflow: hidden; }
 .ai-file-x:hover { background: #f1f3f6; color: var(--text); }
 .ai-msg-files { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; font-size: 11.5px; color: var(--muted); }
 .ai-msg-files span { display: inline-flex; align-items: center; gap: 3px; }
+
+/* ---------- 休日の設定（年度ごとの社内休暇・出社日） ---------- */
+.doff-modal { width: min(1000px, calc(100vw - 32px)); }
+/* 道具（カレンダーで入れるもの）と、年度の 12 か月のカレンダー */
+.doff-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 0 12px; }
+.doff-tool { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 14px 0 11px; border: 1px solid var(--line-2); border-radius: 999px; background: #fff; font: inherit; font-size: 12.5px; color: var(--text); cursor: pointer; }
+.doff-tool:hover { border-color: var(--accent); }
+.doff-tool.on { border-color: var(--accent); background: var(--accent-weak); color: var(--accent); font-weight: 700; box-shadow: inset 0 0 0 1px var(--accent); }
+.doff-hint { color: var(--muted); font-size: 12px; margin-left: 6px; }
+.doff-chip { flex: none; display: inline-block; width: 14px; height: 12px; border-radius: 3px; }
+.doff-chip.off { background: var(--off); box-shadow: inset 0 0 0 1px #e8c3ae; }
+.doff-chip.co { background: #f0a06a; }
+.doff-chip.wk { background: #fff; box-shadow: inset 0 0 0 1.5px #2f6fb5; }
+.doff-cal { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px 18px; user-select: none; -webkit-user-select: none; touch-action: none; }
+.doff-mh { display: flex; align-items: baseline; gap: 6px; margin: 0 0 4px 2px; }
+.doff-mh b { font-size: 16px; }
+.doff-mh span { color: var(--muted); font-size: 11.5px; }
+.doff-mgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.doff-wd { text-align: center; font-size: 10.5px; color: var(--muted); padding-bottom: 2px; }
+.doff-wd.we { color: #c0392b; }
+.doff-d { height: 26px; display: grid; place-items: center; font-size: 12px; border-radius: 5px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.doff-d:hover { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.doff-d.off { background: var(--off); color: #c0392b; }
+.doff-d.co { background: #f0a06a; color: #fff; font-weight: 700; }
+.doff-d.wk { background: #fff; color: #2f6fb5; font-weight: 700; box-shadow: inset 0 0 0 1.5px #2f6fb5; }
+.doff-d.today { text-decoration: underline; text-underline-offset: 2px; }
+.doff-d.sel { box-shadow: inset 0 0 0 2px var(--accent); background-image: linear-gradient(rgba(29, 95, 166, .2), rgba(29, 95, 166, .2)); }
+.doff-cal.painting, .doff-cal.painting * { cursor: crosshair; }
+.doff-legend { display: flex; flex-wrap: wrap; gap: 16px; margin: 12px 0 4px; color: var(--muted); font-size: 11.5px; }
+.doff-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.doff-year { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 6px; }
+.doff-year b { font-size: 15px; }
+.doff-range { color: var(--muted); font-size: 12px; }
+.doff-sec { margin: 14px 0; }
+.doff-sec h3 { margin: 0 0 8px; font-size: 13px; display: flex; align-items: baseline; gap: 8px; }
+.doff-sec h3 small { font-weight: 400; color: var(--muted); font-size: 11.5px; }
+.doff-list { display: flex; flex-direction: column; gap: 6px; }
+.doff-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.doff-name { flex: 1 1 150px; min-width: 120px; height: 30px; padding: 0 8px; border: 1px solid var(--line-2); border-radius: 6px; font: inherit; font-size: 13px; }
+.doff-date { height: 30px; padding: 0 6px; border: 1px solid var(--line-2); border-radius: 6px; font: inherit; font-size: 13px; }
+.doff-sep { color: var(--muted); }
+.doff-n { color: var(--muted); font-size: 12px; min-width: 3.6em; }
+.doff-empty { margin: 4px 0; color: var(--muted); font-size: 12px; }
+.doff-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+/* デスクトップ版：新しい版があるときのボタン */
+.btn.update-btn { border-color: #e0a100; background: #fff8e1; color: #6b4e00; }
+.btn.update-btn:hover:not(:disabled) { background: #ffefb8; }
 
 /* ---------- 印刷 ---------- */
 @media print {

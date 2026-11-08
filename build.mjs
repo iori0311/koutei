@@ -11,10 +11,10 @@ import { dirname, join } from 'node:path';
 const root = dirname(fileURLToPath(import.meta.url));
 const ORDER = [
   'dates.js', 'store.js', 'ui.js', 'layout.js', 'month-range.js', 'file-sync.js',
-  'data-io.js', 'edit-dialogs.js', 'site-pop.js', 'views.js', 'gantt-web.js', 'print.js', 'platform.js', 'main.js',
+  'data-io.js', 'edit-dialogs.js', 'site-pop.js', 'views.js', 'days-off.js', 'gantt-web.js', 'print.js', 'platform.js', 'main.js',
 ];
 // デスクトップ版：platform.js の代わりに、AI のパネルとアプリでのファイル・印刷を入れる
-const DESKTOP_ORDER = ORDER.flatMap((f) => (f === 'platform.js' ? ['agent-ops.js', 'xlsx-read.js', 'attach.js', 'desktop-files.js', 'ai-panel.js', 'platform-desktop.js'] : [f]));
+const DESKTOP_ORDER = ORDER.flatMap((f) => (f === 'platform.js' ? ['agent-ops.js', 'xlsx-read.js', 'attach.js', 'desktop-files.js', 'ai-panel.js', 'desktop-update.js', 'platform-desktop.js'] : [f]));
 const MCP_ORDER = ['dates.js', 'store.js', 'agent-ops.js', 'mcp-server.js'];
 
 // ファイルをつなげる。ほかのファイルからの import と export は外す（Node.js の組み込み（node:）の import は先頭に集める）

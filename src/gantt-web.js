@@ -7,6 +7,7 @@ import { monthRange, MAX_MONTHS } from './month-range.js';
 import { openPropertyDialog } from './edit-dialogs.js';
 import { openSitePop, sitePopPid, sitePopJustClosed, sitePopClosedFor } from './site-pop.js';
 import { openViewEditor } from './views.js';
+import { daysOffButton } from './days-off.js';
 
 // 画面上の選択：sel = パネルで直している予定、editCat = 凡例で名前を書き換え中の種別
 // draft = パネルで打っている途中の内容（確定する前からガントに出す）
@@ -56,7 +57,7 @@ function buildScale(from, to, info) {
   const days = h('div', { class: 'sc-days', style: 'width:' + W + 'px' });
   for (let d = from; d <= to; d++) {
     const inf = info(d);
-    const cls = 'sc-day ' + inf.kind + (inf.w === 6 ? ' is-sat' : '') + (inf.w === 0 ? ' is-sun' : '') + (ymd(d).d === 1 ? ' m1' : '');
+    const cls = 'sc-day ' + inf.kind + (ymd(d).d === 1 ? ' m1' : '');
     days.append(h('div', { class: cls, style: 'left:' + px(d - from) + 'px;width:' + (px(d - from + 1) - px(d - from)) + 'px', title: fmtYMD(d) + '(' + WD_JA[inf.w] + ')' + (inf.name ? ' ' + inf.name : '') },
       h('b', null, ymd(d).d), h('i', null, WD_JA[inf.w])));
   }
@@ -188,6 +189,77 @@ function startBarDrag(ev, bar, e, scroll, from, to) {
   bar.addEventListener('pointercancel', onUp);
 }
 
+// ---------- 現場の行のドラッグ（現場名・施工業者をつかんで上下に動かすと、並び順が変わる。印刷も同じ順） ----------
+// 少し動かしてからドラッグになる（動かさずに離せば、今までどおり「直す」パネルが開く）。Esc でやめる。
+// 上下の端に近づけると、そのままスクロールする
+function startRowDrag(ev, siteBtn, scroll) {
+  const row = siteBtn.closest('.o-row');
+  const body = row.parentElement;
+  const pid = row.dataset.pid;
+  const y0 = ev.clientY;
+  const line = h('div', { class: 'row-drop' });
+  let moved = false, lastY = y0, drop = null, raf = 0;
+  siteBtn.setPointerCapture(ev.pointerId);
+  const others = () => [...body.querySelectorAll(':scope > .o-row')].filter((r) => r !== row);
+  // 指している場所：どの行の前に入れるか。線は、入る場所の上の行と下の行のあいだに引く
+  const place = () => {
+    const rs = others();
+    const i = rs.findIndex((r) => { const b = r.getBoundingClientRect(); return lastY < b.top + b.height / 2; });
+    const before = i < 0 ? null : rs[i], after = i < 0 ? rs[rs.length - 1] || null : rs[i - 1] || null;
+    drop = { before: before ? before.dataset.pid : null, after: after ? after.dataset.pid : null };
+    const top = body.getBoundingClientRect().top;
+    const y = before ? before.getBoundingClientRect().top : after ? after.getBoundingClientRect().bottom : row.getBoundingClientRect().top;
+    line.style.top = (y - top - 2) + 'px';
+    // 今と同じ場所なら、線を薄くする（離しても何も変わらない）
+    const nextRow = row.nextElementSibling && row.nextElementSibling.classList.contains('o-row') ? row.nextElementSibling : null;
+    line.classList.toggle('same', nextRow ? before === nextRow : !before);
+  };
+  const tick = () => {
+    raf = 0;
+    const top = scroll.querySelector('.g-header').getBoundingClientRect().bottom, bottom = scroll.getBoundingClientRect().bottom, edge = 40;
+    const dy = lastY < top + edge ? -Math.ceil((top + edge - lastY) / 3) : lastY > bottom - edge ? Math.ceil((lastY - bottom + edge) / 3) : 0;
+    if (!dy) return;
+    const before = scroll.scrollTop;
+    scroll.scrollTop += dy;
+    if (scroll.scrollTop !== before) { place(); raf = requestAnimationFrame(tick); }
+  };
+  const onMove = (m) => {
+    lastY = m.clientY;
+    if (!moved) {
+      if (Math.abs(lastY - y0) < 5) return;
+      moved = true;
+      row.classList.add('row-dragging');
+      document.body.classList.add('drag-row');
+      body.append(line);
+    }
+    place();
+    if (!raf) raf = requestAnimationFrame(tick);
+  };
+  const finish = (ok) => {
+    siteBtn.removeEventListener('pointermove', onMove);
+    siteBtn.removeEventListener('pointerup', onUp);
+    siteBtn.removeEventListener('pointercancel', onCancel);
+    window.removeEventListener('keydown', onKey, true);
+    if (siteBtn.hasPointerCapture(ev.pointerId)) siteBtn.releasePointerCapture(ev.pointerId);
+    if (raf) cancelAnimationFrame(raf);
+    row.classList.remove('row-dragging');
+    document.body.classList.remove('drag-row');
+    line.remove();
+    if (!moved) return;
+    // ドラッグのあとのクリックで「直す」パネルを開かない
+    suppressClick = true;
+    setTimeout(() => { suppressClick = false; }, 0);
+    if (ok && drop) store.moveProperty(pid, drop);
+  };
+  const onUp = () => finish(true);
+  const onCancel = () => finish(false);
+  const onKey = (k) => { if (k.key === 'Escape' && moved) { k.preventDefault(); k.stopPropagation(); finish(false); } };
+  siteBtn.addEventListener('pointermove', onMove);
+  siteBtn.addEventListener('pointerup', onUp);
+  siteBtn.addEventListener('pointercancel', onCancel);
+  window.addEventListener('keydown', onKey, true);
+}
+
 // ---------- 凡例（種別）：その場で追加・名前と色の変更・削除 ----------
 const NEW_COLORS = ['3D7DCA', 'E67E22', '16A085', '8E44AD', 'D35400', '27AE60', '2C3E50', 'C0392B', '7F8C8D', 'F1C40F'];
 
@@ -253,7 +325,8 @@ function legendItem(c) {
 
 function legendBar() {
   return h('div', { class: 'legend-bar' }, store.state.categories.filter((c) => !c.memo).map(legendItem),
-    h('button', { class: 'lg-add', type: 'button', title: '種別を追加', 'aria-label': '種別を追加', onclick: addCategory }, svgIcon('plus', 14)));
+    h('button', { class: 'lg-add', type: 'button', title: '種別を追加', 'aria-label': '種別を追加', onclick: addCategory }, svgIcon('plus', 14)),
+    daysOffButton());
 }
 
 // ---------- 全体工程 ----------
@@ -305,7 +378,7 @@ export function renderOverview(root) {
   const fit = (rootW - leftW - scrollbarW()) / (to - from + 1);
   dayW = fit >= MIN_DAY_W - 1 ? fit : MIN_DAY_W;
   const W = px(to - from + 1);
-  const info = makeDayInfo();
+  const info = makeDayInfo(store.state);   // 土日・祝日・社内休暇（出社日は除く）
   const view = store.activeView();
   const props = store.viewProperties();
   const editingPid = sitePopPid();
@@ -360,7 +433,8 @@ export function renderOverview(root) {
       if (it.pl.mode === 'right' || it.pl.mode === 'left' || it.pl.mode === 'clip') track.append(sideLabel(it, top, W, 'o-label'));
     }
     // 現場名と施工業者はひとかたまりのボタン：どこを押しても、その場で直せる小さなパネルが出る
-    const site = h('button', { class: 'o-site', type: 'button', title: '現場名・施工業者を直す' },
+    const site = h('button', { class: 'o-site', type: 'button', title: '押すと現場名・施工業者を直せます。上下にドラッグすると並び順を変えられます' },
+      h('i', { class: 'o-grip' }, svgIcon('grip', 14)),
       h('span', { class: 'o-name' }, h('span', { class: 'o-tx' }, p.name)),
       h('span', { class: 'o-who' }, h('span', { class: 'o-tx' }, p.contractor || '')),
       h('i', { class: 'o-pen' }, svgIcon('edit', 12)));
@@ -398,6 +472,8 @@ export function renderOverview(root) {
   // 棒をつかむ → 移動・期間の変更
   scroll.addEventListener('pointerdown', (ev) => {
     if (ev.button !== 0 || ev.target.closest('.pin-btn')) return;
+    const siteBtn = ev.target.closest('.o-site');
+    if (siteBtn) { startRowDrag(ev, siteBtn, scroll); return; }
     const bar = ev.target.closest('.bar');
     const e = bar && st.events.get(bar.dataset.id);
     if (e) startBarDrag(ev, bar, e, scroll, from, to);
@@ -434,7 +510,7 @@ export function renderOverview(root) {
   // 行の空いているところにカーソルを乗せると、その日に「＋」の枠を出す（クリックで予定ができる場所）
   const ghost = h('div', { class: 'add-ghost' }, svgIcon('plus', 14));
   scroll.addEventListener('pointermove', (ev) => {
-    const track = panelKind() || sitePopPid() || document.body.classList.contains('drag-move') || document.body.classList.contains('drag-resize') || ev.target.closest('.bar, .o-label')
+    const track = panelKind() || sitePopPid() || document.body.classList.contains('drag-move') || document.body.classList.contains('drag-resize') || document.body.classList.contains('drag-row') || ev.target.closest('.bar, .o-label')
       ? null : ev.target.closest('.o-track');
     if (!track) { ghost.remove(); return; }
     const r = track.getBoundingClientRect();

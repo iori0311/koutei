@@ -1,6 +1,6 @@
 [package]
 name = "torituke-koutei"
-version = "0.1.0"
+version = "0.1.1"
 description = "取り付け工程表（デスクトップ版）"
 license = "MIT"
 repository = "https://github.com/iori0311/koutei"
@@ -19,3 +19,4 @@ serde_json = "1"
 tokio = { version = "1", features = ["process", "io-util", "sync", "time", "rt-multi-thread"] }
 tempfile = "3"
 sha2 = "0.10"
+tauri-plugin-updater = "2"

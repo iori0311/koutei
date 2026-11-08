@@ -2,6 +2,8 @@
 # 下書きを確かめて「Publish release」を押すと公開される。
 # Mac は、Apple の証明書と公証用の鍵（secrets の APPLE_*。README の「署名の設定」）が登録してあれば、
 # Developer ID で署名して公証する。登録がなければ ad-hoc 署名で作る。
+# アプリの中の更新のため、更新用のファイル（Mac の .app.tar.gz と Windows の setup.exe）に secrets の
+# TAURI_SIGNING_PRIVATE_KEY で署名し、latest.json を作ってリリースに載せる（タグのときは鍵が要る）。
 name: リリース
 
 on:
@@ -83,7 +85,20 @@ jobs:
           API_KEY: ${{ contains(matrix.target, 'apple-darwin') && secrets.APPLE_API_KEY || '' }}
           API_ISSUER: ${{ contains(matrix.target, 'apple-darwin') && secrets.APPLE_API_ISSUER || '' }}
           API_KEY_P8: ${{ contains(matrix.target, 'apple-darwin') && secrets.APPLE_API_KEY_P8 || '' }}
+          # アプリの中の更新に使うファイルの署名（公開鍵は tauri.conf.json の plugins.updater.pubkey）
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
+          updater=()
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            updater=(--config '{"bundle":{"createUpdaterArtifacts":true}}')
+          elif [ "$GITHUB_REF_TYPE" = tag ]; then
+            echo "::error::secrets の TAURI_SIGNING_PRIVATE_KEY（アプリの更新に付ける署名の鍵）が登録されていません"
+            exit 1
+          else
+            unset TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+            echo "::warning::更新用のファイルは作りません（署名の鍵が登録されていない）"
+          fi
           if [ "$MAC_SIGN" = true ]; then
             for name in CERTIFICATE_PASSWORD API_KEY API_ISSUER API_KEY_P8; do
               if [ -z "${!name}" ]; then
@@ -98,7 +113,7 @@ jobs:
               APPLE_SIGNING_IDENTITY="Developer ID Application" \
               APPLE_API_KEY="$API_KEY" APPLE_API_ISSUER="$API_ISSUER" APPLE_API_KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
           fi
-          npx tauri build --target ${{ matrix.target }} --ci
+          npx tauri build --target ${{ matrix.target }} --ci "${updater[@]}"
       - name: dmg を公証する（Mac・署名するとき）
         if: env.MAC_SIGN == 'true'
         env:
@@ -124,8 +139,20 @@ jobs:
             *windows*) src=$(ls "$bundle"/nsis/*-setup.exe) ;;
             *) src=$(ls "$bundle"/dmg/*.dmg) ;;
           esac
-          cp "$src" "out/koutei-$VERSION-${{ matrix.asset }}"
-          ls -la out
+          name="koutei-$VERSION-${{ matrix.asset }}"
+          cp "$src" "out/$name"
+          # アプリの中の更新に使うファイルと署名（署名は latest.json に入れる。リリースには載せない）
+          if ls "$src.sig" >/dev/null 2>&1 || ls "$bundle"/macos/*.app.tar.gz.sig >/dev/null 2>&1; then
+            mkdir -p out/sig
+            case "${{ matrix.target }}" in
+              *windows*) cp "$src.sig" "out/sig/$name.sig" ;;
+              *)
+                upd="${name%.dmg}.app.tar.gz"
+                cp "$(ls "$bundle"/macos/*.app.tar.gz)" "out/$upd"
+                cp "$(ls "$bundle"/macos/*.app.tar.gz.sig)" "out/sig/$upd.sig" ;;
+            esac
+          fi
+          ls -laR out
       - name: 確かめる（Mac：署名・公証と、同梱の Codex が OpenAI の署名のままか）
         if: runner.os == 'macOS'
         run: |
@@ -191,6 +218,31 @@ jobs:
         with:
           path: out
           merge-multiple: true
+      - name: アプリの中の更新に使う latest.json を作る
+        run: |
+          python3 - <<'PY'
+          import datetime, json, os, pathlib
+          tag = os.environ['GITHUB_REF_NAME']
+          v = tag[1:]
+          base = 'https://github.com/' + os.environ['GITHUB_REPOSITORY'] + '/releases/download/' + tag + '/'
+          files = {
+              'darwin-aarch64': f'koutei-{v}-mac-apple-silicon.app.tar.gz',
+              'darwin-x86_64': f'koutei-{v}-mac-intel.app.tar.gz',
+              'windows-x86_64': f'koutei-{v}-windows-x64-setup.exe',
+          }
+          platforms = {}
+          for key, name in files.items():
+              sig = pathlib.Path('out/sig', name + '.sig')
+              if not sig.exists():
+                  raise SystemExit(f'{name} の署名がありません')
+              platforms[key] = {'signature': sig.read_text().strip(), 'url': base + name}
+          data = {'version': v, 'notes': '取り付け工程表 ' + tag,
+                  'pub_date': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                  'platforms': platforms}
+          pathlib.Path('out/latest.json').write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+          PY
+          rm -r out/sig
+          cat out/latest.json
       - name: 下書きを作る
         env:
           GH_TOKEN: ${{ github.token }}

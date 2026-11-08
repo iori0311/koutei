@@ -59,6 +59,8 @@ export async function resetAllData() {
   changes.push({ kind: 'categories', id: 'categories', before: st.categories, after: defaultCategories() });
   changes.push({ kind: 'contractors', id: 'contractors', before: st.contractors, after: [] });
   changes.push({ kind: 'views', id: 'views', before: st.views, after: [] });
+  changes.push({ kind: 'offDays', id: 'offDays', before: st.offDays, after: [] });
+  changes.push({ kind: 'workDays', id: 'workDays', before: st.workDays, after: [] });
   st.prefs.view = null;
   st.prefs.periods = {};
   store.commit('最初の状態に戻す', changes);

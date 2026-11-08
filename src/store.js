@@ -1,5 +1,5 @@
 // データ（現場・予定・種別・施工業者の候補・ビュー）と表示設定の保持、元に戻す/やり直し、自動保存
-import { dn, iso } from './dates.js';
+import { dn, iso, validDn } from './dates.js';
 
 // 配るファイルの種類（サンプル入りなど）。サンプル版はビルド時に window.__KG_EDITION__ が埋め込まれ、
 // 本番のデータと混ざらないように別の保存場所（key）を使う
@@ -58,8 +58,10 @@ function clampMonths(n) { return Math.max(1, Math.min(MAX_PERIOD_MONTHS, Math.ro
 //   Excel のフィルターを「現場」「施工業者」の 2 つの列にかけるのと同じで、両方にチェックが入っている現場を出す。
 //   pids … チェックした現場の id／whos … チェックした施工業者（'' は施工業者なし）。
 //   null は「すべて」（あとで足した現場・施工業者も出る）、[] は何もチェックしていない（何も出ない）
+// offDays: 社内休暇 [{ id, name, start, end }]（お盆・年末年始など。土日・祝日と同じく休み）
+// workDays: 出社日 [日付]（土曜出社など。土日・祝日・社内休暇でも休みにしない）
 export function emptyState() {
-  return { categories: defaultCategories(), properties: new Map(), events: new Map(), contractors: [], views: [], prefs: defaultPrefs() };
+  return { categories: defaultCategories(), properties: new Map(), events: new Map(), contractors: [], views: [], offDays: [], workDays: [], prefs: defaultPrefs() };
 }
 
 // 名前を比べるためのキー。全角・半角、ひらがな・カタカナ、大文字・小文字の違いを無視する。
@@ -97,6 +99,8 @@ export function serialize(st) {
     events: [...st.events.values()].map((e) => ({ ...e, start: iso(e.start), end: iso(e.end) })),
     contractors: st.contractors,
     views: st.views,
+    offDays: st.offDays.map((o) => ({ ...o, start: iso(o.start), end: iso(o.end) })),
+    workDays: st.workDays.map(iso),
     prefs: st.prefs,
   };
 }
@@ -134,6 +138,15 @@ export function deserialize(obj) {
       return { id: String(v.id), name: String(v.name || 'ビュー'), pids, whos };
     });
   }
+  // 社内休暇・出社日。前の版のデータには無いので、無いファイルには印を付けておき、
+  // ほかで書き換えられたファイルを取り込むときに「全部消された」と取り違えないようにする
+  st.offDays = (Array.isArray(obj.offDays) ? obj.offDays : []).map((o) => {
+    const s = dn(o && o.start), e = dn(o && o.end);
+    if (!validDn(s)) return null;
+    return { id: String(o.id || uid('h')), name: String(o.name || '').trim().slice(0, 40), start: s, end: validDn(e) && e >= s ? e : s };
+  }).filter(Boolean).sort((a, b) => a.start - b.start || a.end - b.end);
+  st.workDays = [...new Set((Array.isArray(obj.workDays) ? obj.workDays : []).map((x) => dn(x)).filter(validDn))].sort((a, b) => a - b);
+  if (!('offDays' in obj) && !('workDays' in obj)) Object.defineProperty(st, 'noDaysOff', { value: true });
   const op = obj.prefs || {}, pp = op.print || {};
   if (op.view && st.views.some((v) => v.id === op.view)) st.prefs.view = op.view;
   if (op.periods && typeof op.periods === 'object') {
@@ -182,7 +195,9 @@ export function mergeFromFile(base, theirs, ours) {
       changes.push({ kind, id, before: o, after: t });
     }
   }
-  for (const kind of ['categories', 'contractors', 'views']) {
+  for (const kind of ['categories', 'contractors', 'views', 'offDays', 'workDays']) {
+    // 社内休暇・出社日を知らない前の版が書いたファイルなら、そこは変わっていないことにする
+    if ((kind === 'offDays' || kind === 'workDays') && theirs.noDaysOff) continue;
     if (eq(base[kind], theirs[kind])) continue;
     if (!eq(base[kind], ours[kind])) { if (!eq(ours[kind], theirs[kind])) conflicts++; continue; }
     changes.push({ kind, id: kind, before: ours[kind], after: theirs[kind] });
@@ -237,7 +252,7 @@ export const store = {
     for (const fn of this.listeners) fn('saved');
   },
 
-  // changes: [{ kind: 'event'|'property'|'categories'|'contractors'|'views', id, before, after }]
+  // changes: [{ kind: 'event'|'property'|'categories'|'contractors'|'views'|'offDays'|'workDays', id, before, after }]
   commit(label, changes) {
     // 同じものへの変更が複数あれば、最初の「前」と最後の「後」にまとめる
     const merged = new Map();
@@ -264,6 +279,8 @@ export const store = {
       else if (c.kind === 'categories') st.categories = v;
       else if (c.kind === 'contractors') st.contractors = v;
       else if (c.kind === 'views') st.views = v;
+      else if (c.kind === 'offDays') st.offDays = v;
+      else if (c.kind === 'workDays') st.workDays = v;
     }
   },
   undo() {
@@ -377,6 +394,30 @@ export const store = {
     const cur = this.state.properties.get(id);
     if (!cur) return;
     this.commit(label, [{ kind: 'property', id, before: cur, after: { ...cur, ...patch } }, ...extra]);
+  },
+  // 現場の並び順を変える（行のドラッグ）。before の現場のすぐ前へ。before が無ければ after の現場のすぐ後ろへ（どちらも無ければ最後）。
+  // ビューで絞り込んでいるときも、見えている前後の現場を渡せば、全体の並びの中でその間に入る。
+  // ふつうは動かした現場の order だけを前後の間の値にする（ほかの現場は変えない）。間が詰まっているときだけ全部振り直す
+  moveProperty(id, { before = null, after = null } = {}) {
+    const cur = this.state.properties.get(id);
+    if (!cur) return false;
+    const all = this.sortedProperties();
+    const rest = all.filter((p) => p.id !== id);
+    let i = before ? rest.findIndex((p) => p.id === before) : -1;
+    if (i < 0) {
+      const j = after ? rest.findIndex((p) => p.id === after) : -1;
+      i = j >= 0 ? j + 1 : rest.length;
+    }
+    if (all.findIndex((p) => p.id === id) === i) return false;   // 今と同じ場所
+    const o = (p) => p.order || 0;
+    const prev = rest[i - 1], next = rest[i];
+    const ord = !prev && !next ? 1 : !prev ? o(next) - 1 : !next ? o(prev) + 1 : (o(prev) + o(next)) / 2;
+    const fits = Number.isFinite(ord) && (!prev || o(prev) < ord) && (!next || ord < o(next)) && (!prev || !next || o(next) - o(prev) > 1e-6);
+    const changes = fits
+      ? [{ kind: 'property', id, before: cur, after: { ...cur, order: ord } }]
+      : [...rest.slice(0, i), cur, ...rest.slice(i)].map((p, k) => ({ kind: 'property', id: p.id, before: p, after: { ...p, order: k + 1 } }));
+    this.commit('現場の並び順を変更', changes);
+    return true;
   },
   // 施工業者を候補の先頭に入れる変更（まだ無ければ足す）。空なら null
   contractorChange(name) {
