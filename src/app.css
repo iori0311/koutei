@@ -333,7 +333,8 @@ body.pp-open { overflow: hidden; }
 .pp-top-l { color: #fff; font-weight: 700; font-size: 12.5px; white-space: nowrap; }
 .pp-top .mr-step { color: #d6dbe1; }
 .pp-top .mr-step:hover:not(:disabled) { background: rgba(255, 255, 255, .12); color: #fff; }
-.pp-pages { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+.pp-fit { margin: 0 auto; }
+.pp-pages { display: flex; flex-direction: column; align-items: center; gap: 24px; width: max-content; transform-origin: 0 0; }
 .pp-pages .page { box-shadow: 0 6px 24px rgba(0, 0, 0, .35); flex: none; }
 .pp-measure { position: absolute; left: -20000px; top: 0; visibility: hidden; pointer-events: none; }
 
@@ -466,9 +467,10 @@ body.pp-open { overflow: hidden; }
   html, body { height: auto !important; background: #fff !important; overflow: visible !important; }
   body > *:not(.pp-overlay) { display: none !important; }
   .pp-overlay { position: static !important; display: block !important; background: none !important; }
-  .pp-side, .pp-measure, .ai-pane { display: none !important; }
+  .pp-side, .pp-top, .pp-measure, .ai-pane { display: none !important; }
   .pp-view { padding: 0 !important; overflow: visible !important; }
-  .pp-pages { display: block !important; zoom: 1 !important; }
+  .pp-fit { width: auto !important; height: auto !important; margin: 0 !important; }
+  .pp-pages { display: block !important; width: auto !important; transform: none !important; }
   .pp-pages .page { box-shadow: none !important; margin: 0 !important; break-after: page; page-break-after: always; }
   .pp-pages .page:last-child { break-after: auto; page-break-after: auto; }
 }

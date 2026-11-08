@@ -9,10 +9,12 @@ import { overviewRange } from './gantt-web.js';
 const PX_PER_MM = 96 / 25.4;
 const PAPER = { A4: [297, 210], A3: [420, 297], B4: [364, 257] };
 const PT = 8;   // 文字の大きさ（pt）
+const SLACK = 1;   // ページを紙より低くする分（mm）。紙とぴったり同じ高さだと、端数で白紙のページが 1 枚増える
 const mm = (v) => (Math.round(v * 1000) / 1000) + 'mm';
 
 let overlay = null;
 let pagesEl = null;
+let fitEl = null;
 let measureEl = null;
 let infoEl = null;
 let topEl = null;
@@ -56,20 +58,27 @@ function buildOverlay() {
   const view = h('div', { class: 'pp-view' });
   topEl = h('div', { class: 'pp-top' });
   pagesEl = h('div', { class: 'pp-pages' });
+  fitEl = h('div', { class: 'pp-fit' }, pagesEl);
   measureEl = h('div', { class: 'pp-measure', 'aria-hidden': 'true' });
-  view.append(topEl, pagesEl);
+  view.append(topEl, fitEl);
   overlay.append(side, view, measureEl);
   document.body.append(overlay);
   document.body.classList.add('pp-open');
   overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closePrintPreview(); } });
 }
 
+// プレビューは、実寸で組んだページを丸ごと縮めて画面の幅に合わせる。
+// 縮めるのは transform で行う（CSS の zoom だと、Mac のアプリや Safari が小さくなった文字を 9px より小さくせず、
+// 文字だけが組んだときより大きくなって、となりの棒や文字にかかる）。印刷は縮めない実寸のまま
 function fitZoom() {
   if (!overlay || !pagesEl.firstElementChild) return;
-  const view = pagesEl.parentElement;
+  const view = fitEl.parentElement;
   const pw = pagesEl.firstElementChild.offsetWidth;
-  const z = Math.min(1, (view.clientWidth - 56) / pw);
-  pagesEl.style.zoom = String(Math.max(0.2, z));
+  const z = Math.max(0.2, Math.min(1, (view.clientWidth - 56) / pw));
+  pagesEl.style.transform = z < 1 ? 'scale(' + z + ')' : '';
+  // transform は場所を取る大きさを変えないので、縮めたあとの大きさを外側の箱に持たせる（スクロールと中央寄せのため）
+  fitEl.style.width = pagesEl.offsetWidth * z + 'px';
+  fitEl.style.height = pagesEl.offsetHeight * z + 'px';
 }
 
 // ---------- 設定パネル ----------
@@ -291,7 +300,7 @@ function overviewPages(cfg, pw, ph) {
 
   const periodText = periodLabel(from, to);
   const factory = (i, n) => {
-    const page = h('section', { class: 'page ov', style: 'width:' + mm(pw) + ';height:' + mm(ph) + ';font-size:' + PT + 'pt;padding:' + mm(padY) + ' ' + mm(padX) });
+    const page = h('section', { class: 'page ov', style: 'width:' + mm(pw) + ';height:' + mm(ph - SLACK) + ';font-size:' + PT + 'pt;padding:' + mm(padY) + ' ' + mm(padX) });
     const head = h('header', { class: 'p-head' },
       h('div', { class: 'p-hl' }, h('div', { class: 'p-name' }, '取り付け工程表'),
         h('div', { class: 'p-meta' }, view ? h('span', null, h('em', null, 'ビュー'), view.name) : null, h('span', null, h('em', null, '期間'), periodText))),
